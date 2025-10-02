@@ -122,7 +122,7 @@ export default {
       return this.$store.getters.myPeerId;
     },
     connectionURL: function() {
-      return `http://192.168.68.16:8080/connect?id=${this.myPeerId}`;
+      return `https://p2p-chat.vercel.app/connect?id=${this.myPeerId}`;
     },
   },
   async created() {
