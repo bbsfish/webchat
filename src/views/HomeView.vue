@@ -61,18 +61,28 @@
     </div>
     <div v-if="myPeerId">
       <p>あなたのID:</p>
-      <strong class="peer-id">{{ myPeerId }}</strong>
+      <ClipboardBox :text="myPeerId" />
     </div>
     <div v-else>
       <p>PeerServerに接続中...</p>
     </div>
     <QRCode v-if="myPeerId" :text="connectionURL" />
     <div class="connect-form">
-      <input 
-        v-model="vmRemotePeerId" 
-        type="text" 
-        placeholder="相手のPeer IDを入力"
-      />
+      <InputText ref="formRemotePeerId" placeholder="相手のIDを入力" @change="(v) => remotePeerId = v" />
+      <div>
+        <span>登録した接続先</span>
+        <SpeechBubble>
+          <IconCircleQuestion />
+          <template #bubble>
+            お使いのPCに保存された登録済みの接続先を選択できます.<br />
+            最近接続したものほど上に表示されます.
+          </template>
+        </SpeechBubble>:
+        <select v-model="vmSelectedRecents">
+          <option selected value="">登録した接続先を選択</option>
+          <option v-for="(d, i) of recentRemotePeerId" :key="i" :value="d.id">{{ d.nickname }}</option>
+        </select>
+      </div>
       <button @click="connect">接続</button>
     </div>
   </div>
@@ -82,23 +92,29 @@
 import { Peer } from 'peerjs';
 import ws from '@/lib/ws';
 import WebChatDB from '@/lib/webchatdb';
+const db = new WebChatDB();
 import IconCircleQuestion from '@/components/icons/IconCircleQuestion.vue';
 import ToggleButton from '@/components/ToggleButton.vue';
 import SpeechBubble from '@/components/SpeechBubble.vue';
 import QRCode from '@/components/QRCode.vue';
-const db = new WebChatDB();
+import InputText from '@/components/InputText.vue';
+import ClipboardBox from '@/components/ClipboardBox.vue';
 
 export default {
   name: 'HomeView',
   components: {
     IconCircleQuestion,
+    ClipboardBox,
     SpeechBubble,
     ToggleButton,
+    InputText,
     QRCode,
   },
   data() {
     return {
-      vmRemotePeerId: '',
+      remotePeerId: '',
+      recentRemotePeerId: [],
+      vmSelectedRecents: '',
     };
   },
   computed: {
@@ -107,34 +123,6 @@ export default {
     },
     connectionURL: function() {
       return `http://192.168.68.16:8080/connect?id=${this.myPeerId}`;
-    },
-  },
-  methods: {
-    async enableMessageSaving() {
-      if (await this.$dialog.confirm('これを有効化すると、メッセージが保存されます. よろしいですか?') === false) return this.$refs.messageSaving.setOff();
-      this.$store.commit('setOption', { k: 'isMessageSaved', v: true });
-    },
-    async enableAppEncryption() {
-      if (await this.$dialog.confirm(
-        'これを有効化すると、アプリケーション暗号化が有効化されます.\nなお、保存データは暗号化されません. よろしいですか?'
-      ) === false) return this.$refs.appEncryption.setOff();
-      this.$store.commit('setOption', { k: 'isAppEncryptionUsed', v: true });
-    },
-    async clearMessageData() {
-      if (await this.$dialog.confirm('メッセージデータが削除されます. この操作は元に戻せません.') === false) return;
-    },
-    async clearLocalData() {
-      if (await this.$dialog.confirm('すべてのデータが削除されます. この操作は元に戻せません.') === false) return;
-      db.clearClients();
-      db.clearMessages();
-    },
-    connect() {
-      const remotePeerId = this.vmRemotePeerId.trim();
-      if (!remotePeerId) {
-        this.$dialog.alert('相手のIDを入力してください');
-        return;
-      }
-      this.$router.push({ name: 'Connect', query: { id: remotePeerId } });
     },
   },
   async created() {
@@ -176,12 +164,44 @@ export default {
       console.error(err);
       this.$dialog.alert('接続が切断されました: ' + err.type);
     });
-  }
+  },
+  methods: {
+    async enableMessageSaving() {
+      if (await this.$dialog.confirm('これを有効化すると、メッセージが保存されます. よろしいですか?') === false) return this.$refs.messageSaving.setOff();
+      this.$store.commit('setOption', { k: 'isMessageSaved', v: true });
+    },
+    async enableAppEncryption() {
+      if (await this.$dialog.confirm(
+        'これを有効化すると、アプリケーション暗号化が有効化されます.\nなお、保存データは暗号化されません. よろしいですか?'
+      ) === false) return this.$refs.appEncryption.setOff();
+      this.$store.commit('setOption', { k: 'isAppEncryptionUsed', v: true });
+    },
+    async clearMessageData() {
+      if (await this.$dialog.confirm('メッセージデータが削除されます. この操作は元に戻せません.') === false) return;
+    },
+    async clearLocalData() {
+      if (await this.$dialog.confirm('すべてのデータが削除されます. この操作は元に戻せません.') === false) return;
+      db.clearClients();
+      db.clearMessages();
+    },
+    connect() {
+      const remotePeerId = this.remotePeerId.trim();
+      if (!remotePeerId) {
+        this.$dialog.alert('相手のIDを入力してください');
+        return;
+      }
+      this.$router.push({ name: 'Connect', query: { id: remotePeerId } });
+    },
+  },
+  watch: {
+    vmSelectedRecents(to) {
+      if (to === '') return;
+      this.remotePeerId = to;
+      this.$refs.formRemotePeerId.set(to);
+    },
+  },
+  async mounted() {
+    this.recentRemotePeerId = await db.getAllClients();
+  },
 };
 </script>
-
-<style lang="scss" scoped>
-.home {
-  text-align: center;
-}
-</style>

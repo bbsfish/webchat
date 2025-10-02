@@ -4,6 +4,8 @@
 import { mapGetters } from 'vuex';
 import Encryption from '@/lib/encryption';
 const crypto = new Encryption();
+import WebChatDB from '@/lib/webchatdb';
+const db = new WebChatDB();
 
 export default {
   name: 'ChatSecureView',
@@ -105,6 +107,14 @@ export default {
       }
       this.$store.commit('setChat', { k: 'content', v: null });
       this.$store.commit('setChat', { k: 'isContentUpdated', v: false });
+    }
+  },
+  beforeUnmount() {
+    const connection = this.$store.getters.connection;
+    if (connection) {
+      connection.off('data', this.onDataReceived);
+      connection.off('close', this.onConnectionClosed);
+      connection.off('error', this.onConnectionError);
     }
   },
 };

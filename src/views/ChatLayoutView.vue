@@ -25,7 +25,7 @@
       </div>
     </div>
     <div v-else>IDが不正です</div>
-    <router-view />
+    <router-view :key="$route.fullPath" />
   </div>
 </template>
 
@@ -84,16 +84,6 @@ $line-text: #333333;
 $line-text-light: #050505;
 $line-text-muted: #aaaaaa;
 $line-border: #e0e0e0;
-
-/* --- 基本設定 --- */
-body, html {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-}
 
 /* --- チャットコンテナ全体 --- */
 .chat-container {

@@ -63,6 +63,7 @@ $track-height: 34px; // トラック（背景）の高さ
 $track-width: 60px; // トラックの幅
 
 .toggle-button {
+  display: inline-block;
   /* トラック（背景）部分のスタイル */
   label {
     display: inline-block;

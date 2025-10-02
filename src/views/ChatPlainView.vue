@@ -2,6 +2,8 @@
 
 <script>
 import { mapGetters } from 'vuex';
+import WebChatDB from '@/lib/webchatdb';
+const db = new WebChatDB();
 
 export default {
   name: 'ChatPlainView',
