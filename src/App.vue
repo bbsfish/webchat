@@ -1,30 +1,49 @@
 <template>
-  <nav>
-    <router-link to="/">Home</router-link> |
-    <router-link to="/about">About</router-link>
-  </nav>
-  <router-view/>
+  <router-view />
 </template>
 
+<script>
+export default {
+  name: 'App',
+  methods: {
+    async onPeerClose() {
+      await this.$dialog.alert('接続が切断されました(peer-close)');
+      this.$store.commit('closeConnection');
+      this.$router.push({ name: 'Home' });
+    },
+    async onPeerDisconnected() {
+      await this.$dialog.alert('接続が切断されました(peer-disconnected)');
+      this.$store.commit('closeConnection');
+      this.$router.push({ name: 'Home' });
+    },
+    async onPeerError(err) {
+      await this.$dialog.alert(`接続エラーが発生しました: ${err.type}`);
+      console.error(err);
+      this.$router.push({ name: 'Home' });
+    },
+  },
+  created() {
+    this.$store.watch(
+      (state, getters) => getters.peer,
+      (to) => {
+        if (to === null) return;
+        to.on('close', this.onPeerClose);
+        to.on('disconnected', this.onPeerDisconnected);
+        to.on('error', this.onPeerError);
+      },
+    )
+  },
+};
+</script>
+
 <style>
-#app {
+html, body, #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-}
-
-nav {
-  padding: 30px;
-}
-
-nav a {
-  font-weight: bold;
-  color: #2c3e50;
-}
-
-nav a.router-link-exact-active {
-  color: #42b983;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 </style>
