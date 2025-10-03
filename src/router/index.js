@@ -3,10 +3,9 @@ import HomeView from '@/views/HomeView.vue';
 import ConnectView from '@/views/ConnectView.vue';
 import ReceptionView from '@/views/ReceptionView.vue';
 import KeyExchangeView from '@/views/KeyExchangeView.vue';
+import OptionExchangeView from '@/views/OptionExchangeView.vue';
 import FileView from '@/views/FileView.vue';
-import ChatLayoutView from '@/views/ChatLayoutView.vue';
-import ChatPlainView from '@/views/ChatPlainView.vue';
-import ChatSecureView from '@/views/ChatSecureView.vue';
+import ChatView from '@/views/ChatView.vue';
 
 const routes = [
   {
@@ -30,20 +29,14 @@ const routes = [
     component: KeyExchangeView,
   },
   {
-    path: '/c',
-    component: ChatLayoutView,
-    children: [
-      {
-        path: 'plain',
-        name: 'ChatPlain',
-        component: ChatPlainView,
-      },
-      {
-        path: 'secure',
-        name: 'ChatSecure',
-        component: ChatSecureView,
-      }
-    ]
+    path: '/option-exchange',
+    name: 'OptionExchange',
+    component: OptionExchangeView,
+  },
+  {
+    path: '/chat',
+    name: 'Chat',
+    component: ChatView,
   },
   {
     path: '/file',

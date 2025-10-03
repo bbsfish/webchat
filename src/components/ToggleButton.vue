@@ -10,7 +10,7 @@ import { useId } from 'vue';
 
 export default {
   name: 'ToggleButton',
-  emits: ['on', 'off'],
+  emits: ['on', 'off', 'toggle'],
   props: {
     init: {
       type: Boolean,
@@ -33,10 +33,10 @@ export default {
   },
   watch: {
     async vmCheckBox(to, from) {
-      if (this.init) return;
       if (this.lock) return this.$nextTick(() => this.vmCheckBox = from);
       if (to) this.$emit('on');
       else this.$emit('off');
+      this.$emit('toggle', to);
     },
   },
   /** 親コンポーネントからの呼び出し用 */
@@ -48,8 +48,8 @@ export default {
       this.vmCheckBox = false;
     },
   },
-  created() {
-    if (this.init) this.vmCheckBox = true;
+  mounted() {
+    this.vmCheckBox = this.init;
   },
 };
 </script>

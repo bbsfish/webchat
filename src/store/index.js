@@ -18,18 +18,7 @@ export default createStore({
     /** ユーザーオプションデータ */
     options: {
       isMessageSaved: false,
-      isAppEncryptionUsed: false,
-    },
-    /** ChatLayoutView.vueで使うデータ */
-    chat: {
-      /** @type { Boolean } ローディング中フラグ */
-      isLoading: false,
-      /** @type { String } ローディングメッセージ */
-      loadingMessage: '',
-      /** @type { String } 送信コンツンツ */
-      content: null,
-      /** @type { String } 送信コンツンツが更新されたことを通知 */
-      isContentUpdated: false,
+      isAppEncryptionDisabled: false,
     },
     /** @type { CryptoKey } 暗号化キー */
     enckey: null,
@@ -44,8 +33,8 @@ export default createStore({
     messages: (state) => state.messages,
     isReceiver: (state) => state.isReceiver,
     isMessageSaved: (state) => state.options.isMessageSaved,
-    isAppEncryptionUsed: (state) => state.options.isAppEncryptionUsed,
-    chat: (state) => state.chat,
+    isAppEncryptionDisabled: (state) => state.options.isAppEncryptionDisabled,
+    isAppEncryptionUsed: (state) => !state.options.isAppEncryptionDisabled,
     enckey: (state) => state.enckey,
     deckey: (state) => state.deckey,
   },
@@ -89,27 +78,32 @@ export default createStore({
       state.messages = [];
     },
     setOption(state, { k, v }) {
+      console.debug('Option is changed: %s = %s', k, v);
       state.options[k] = v;
     },
-    setChat(state, { k, v }) {
-      state.chat[k] = v;
-    },
     setKeys(state, { enckey, deckey }) {
+      console.debug('CryptoKeys are set');
       if (enckey !== undefined) state.enckey = enckey;
       if (deckey !== undefined) state.deckey = deckey;
     },
   },
   actions: {
     sendMessage({ getters }, { type, content }) {
-      if (getters.connection === null && !this.$store.getters.isConnected) return;
+      console.group('MessageSending');
+      if (getters.connection === null && !this.$store.getters.isConnected) {
+        console.debug('failed');
+        return;
+      }
       const message = {
         from: getters.myPeerId,
         type: type,
         timestamp: new Date(),
         content,
       };
-      console.debug('Message is sended:', message);
+      console.debug(message);
       getters.connection.send(message);
+      console.debug('success');
+      console.groupEnd();
       return message;
     },
   },

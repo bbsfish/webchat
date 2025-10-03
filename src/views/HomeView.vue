@@ -13,25 +13,22 @@
           </template>
         </SpeechBubble>:
         <ToggleButton ref="messageSaving"
-          :init="$store.getters.isMessageSaved"
-          @on="enableMessageSaving"
-          @off="$store.commit('setOption', { k: 'isMessageSaved', v: false })"
+          :init="isMessageSaved"
+          @toggle="(v) => $store.commit('setOption', { k: 'isMessageSaved', v })"
         />
       </div>
       <div>
-        <span>アプリケーションによる暗号化を使用する</span>
+        <span>アプリケーション暗号化を無効化する</span>
         <SpeechBubble>
           <IconCircleQuestion />
           <template #bubble>
-            通信データをアプリケーションレイヤーで暗号化します.<br />
-            なお、これをオンにしなくても、通信は安全です.<br />
-            追加の安全性を得たい場合にのみ有効化してください.
+            通信データのアプリケーション暗号化を無効化します.<br />
+            端末のリソースが制限されている場合にのみ無効化してください.
           </template>
         </SpeechBubble>:
         <ToggleButton ref="appEncryption"
-          :init="$store.getters.isAppEncryptionUsed"
-          @on="enableAppEncryption"
-          @off="$store.commit('setOption', { k: 'isAppEncryptionUsed', v: false })"
+          :init="isAppEncryptionDisabled"
+          @toggle="(v) => $store.commit('setOption', { k: 'isAppEncryptionDisabled', v })"
         />
       </div>
       <div>
@@ -93,6 +90,7 @@
 
 <script>
 import { Peer } from 'peerjs';
+import { mapGetters } from 'vuex';
 import ws from '@/lib/ws';
 import WebChatDB from '@/lib/webchatdb';
 const db = new WebChatDB();
@@ -122,12 +120,7 @@ export default {
     };
   },
   computed: {
-    myPeerId: function() {
-      return this.$store.getters.myPeerId;
-    },
-    peer: function() {
-      return this.$store.getters.peer;
-    },
+    ...mapGetters(['peer', 'myPeerId', 'isAppEncryptionDisabled', 'isMessageSaved']),
     connectionURL: function() {
       return `https://p2p-chat.vercel.app/connect?id=${this.myPeerId}`;
     },
@@ -145,12 +138,26 @@ export default {
         if (!lastPeerId) ws.ls.set('peer_id', { id, created: new Date() });
         this.$store.commit('setMyPeerId', id);
       });
-
-      // エラーハンドリングはApp.vueで集約しているのでここでは不要
     }
 
     // --- 2. 接続待機リスナーの設定 ---
-    this.setupConnectionListener();
+    if (this.peer) {
+      // 既にpeerオブジェクトが存在する場合は、安全のために一度解除してから再設定
+      this.peer.off('connection', this.onConnectionReceived);
+      this.peer.on('connection', this.onConnectionReceived);
+    } else {
+      // peerオブジェクトがまだ生成されていない場合（初回起動時など）は、
+      // ストアの変更を監視して、生成されたらリスナーを設定する
+      const unwatch = this.$store.watch(
+        (state, getters) => getters.peer,
+        (newPeer) => {
+          if (newPeer) {
+            newPeer.on('connection', this.onConnectionReceived);
+            unwatch(); // 一度設定したら監視は解除
+          }
+        }
+      );
+    }
 
     // --- 3. 過去データの読み込み ---
     this.recentRemotePeerId = await db.getAllClients();
@@ -167,40 +174,11 @@ export default {
   },
   methods: {
     // 接続待機リスナーをセットアップするメソッド
-    setupConnectionListener() {
-      if (this.peer) {
-        // 既にpeerオブジェクトが存在する場合は、安全のために一度解除してから再設定
-        this.peer.off('connection', this.onConnectionReceived);
-        this.peer.on('connection', this.onConnectionReceived);
-      } else {
-        // peerオブジェクトがまだ生成されていない場合（初回起動時など）は、
-        // ストアの変更を監視して、生成されたらリスナーを設定する
-        const unwatch = this.$store.watch(
-          (state, getters) => getters.peer,
-          (newPeer) => {
-            if (newPeer) {
-              newPeer.on('connection', this.onConnectionReceived);
-              unwatch(); // 一度設定したら監視は解除
-            }
-          }
-        );
-      }
-    },
     // 相手から接続要求があったときに呼び出されるメソッド
     onConnectionReceived(connection) {
       console.debug('Connection is established');
       this.$store.commit('setConnection', connection);
       this.$router.push({ name: 'Connect', query: { id: connection.peer } });
-    },
-    async enableMessageSaving() {
-      if (await this.$dialog.confirm('これを有効化すると、メッセージが保存されます. よろしいですか?') === false) return this.$refs.messageSaving.setOff();
-      this.$store.commit('setOption', { k: 'isMessageSaved', v: true });
-    },
-    async enableAppEncryption() {
-      if (await this.$dialog.confirm(
-        'これを有効化すると、アプリケーション暗号化が有効化されます.\nなお、保存データは暗号化されません. よろしいですか?'
-      ) === false) return this.$refs.appEncryption.setOff();
-      this.$store.commit('setOption', { k: 'isAppEncryptionUsed', v: true });
     },
     async clearMessageData() {
       if (await this.$dialog.confirm('メッセージデータが削除されます. この操作は元に戻せません.') === false) return;

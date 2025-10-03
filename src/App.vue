@@ -20,12 +20,12 @@ export default {
     async onPeerClose() {
       await this.$dialog.alert('接続が切断されました(peer-close)');
       this.$store.commit('closeConnection');
-      this.$router.push({ name: 'Reception', query: { disconnected: true } });
+      this.$router.push({ name: 'Home' });
     },
     async onPeerDisconnected() {
       await this.$dialog.alert('接続が切断されました(peer-disconnected)');
       this.$store.commit('closeConnection');
-      this.$router.push({ name: 'Reception', query: { disconnected: true } });
+      this.$router.push({ name: 'Home' });
     },
     async onPeerError(err) {
       await this.$dialog.alert(`接続エラーが発生しました: ${err.type}`);

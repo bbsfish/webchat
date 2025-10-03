@@ -5,7 +5,6 @@
       <LoadingSpinner v-if="isLoading" :m="statusMessage" />
       <div v-if="!isLoading && !error">
         <p>鍵交換が完了しました。</p>
-        <button @click="startChat">チャットを開始</button>
       </div>
       <div v-if="error">
         <p class="error-message">{{ error }}</p>
@@ -31,6 +30,9 @@ export default {
       isLoading: true,
       statusMessage: '初期化しています...',
       error: null,
+      hasSentMyKey: false,
+      hasReceivedRemoteKey: false,
+      retryInterval: null,
     };
   },
   computed: {
@@ -47,26 +49,32 @@ export default {
       return;
     }
 
-    // データ受信時のイベントリスナーを設定
     connection.on('data', this.onDataReceived);
 
     try {
-      // 1. RSAキーペアを生成
       this.statusMessage = '暗号鍵を生成しています...';
       const keys = await crypto.generateKeys();
       const myPublicKeyJwk = await crypto.exportKeyAsJwk(keys.publicKey);
-
-      // 2. 自分の秘密鍵をVuexストアに保存
       this.$store.commit('setKeys', { deckey: keys.privateKey });
 
-      // 3. 自分の公開鍵を相手に送信
       this.statusMessage = '公開鍵を送信しています...';
-      this.$store.dispatch('sendMessage', {
+      const sendMessage = () => this.$store.dispatch('sendMessage', {
         type: 'key-exchange',
         content: myPublicKeyJwk,
       });
-
+      
+      sendMessage(); // 最初の送信
+      this.hasSentMyKey = true;
       this.statusMessage = '相手の公開鍵を待っています...';
+      
+      // 相手から受信するまで1.5秒ごとに再送
+      this.retryInterval = setInterval(() => {
+        if (!this.hasReceivedRemoteKey) {
+          sendMessage();
+        }
+      }, 1500);
+
+      this.checkIfComplete();
 
     } catch (err) {
       console.error('鍵交換中にエラーが発生しました:', err);
@@ -77,15 +85,13 @@ export default {
   methods: {
     async onDataReceived(data) {
       if (data.type === 'key-exchange') {
+        if (this.hasReceivedRemoteKey) return;
         try {
           this.statusMessage = '相手の公開鍵を受信しました。';
-          // 4. 相手の公開鍵を受け取り、インポートして暗号化鍵としてVuexストアに保存
           const enckey = await crypto.importJwkAsKey(data.content, ['encrypt']);
           this.$store.commit('setKeys', { enckey: enckey, deckey: this.deckey });
-
-          this.statusMessage = '鍵交換が完了しました。';
-          this.isLoading = false;
-
+          this.hasReceivedRemoteKey = true;
+          this.checkIfComplete();
         } catch (err) {
           console.error('受信した公開鍵の処理中にエラーが発生しました:', err);
           this.error = '受信した公開鍵のフォーマットが不正です。';
@@ -93,9 +99,15 @@ export default {
         }
       }
     },
-    startChat() {
-      // 5. ChatSecureViewに遷移
-      this.$router.push({ name: 'ChatSecure', query: { id: this.remotePeerId } });
+    checkIfComplete() {
+      if (this.hasSentMyKey && this.hasReceivedRemoteKey) {
+        clearInterval(this.retryInterval); // 再送を停止
+        this.statusMessage = '鍵交換が完了しました。';
+        this.isLoading = false;
+        setTimeout(() => {
+          this.$router.push({ name: 'OptionExchange', query: { id: this.remotePeerId } });
+        }, 500);
+      }
     },
     goHome() {
       this.$store.commit('closeConnection');
@@ -103,7 +115,7 @@ export default {
     }
   },
   beforeUnmount() {
-    // コンポーネントが破棄される際にイベントリスナーを解除
+    clearInterval(this.retryInterval); // 画面を離れる際にタイマーをクリア
     const connection = this.connection;
     if (connection) {
       connection.off('data', this.onDataReceived);
@@ -113,6 +125,7 @@ export default {
 </script>
 
 <style scoped>
+/* スタイルは変更なし */
 .key-exchange {
   display: flex;
   justify-content: center;
