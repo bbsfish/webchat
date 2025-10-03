@@ -111,6 +111,9 @@ export default {
         if (this.connectionName === '') return this.$dialog.alert('この接続に付ける名前を入力してください');
         db.addClient({ id: this.remotePeerId, alias: '', nickname: this.connectionName });
       }
+
+      // 前回の接続先として保存
+      await db.setState('lastRemotePeerId', this.remotePeerId);
       
       // 送信者の場合、コネクションを確立
       if (!this.isReceiver) {
@@ -126,6 +129,7 @@ export default {
             reject(err);
           });
         }))();
+
         // ReceptionViewへ遷移して相手の応答を待つ
         return this.$router.push({ name: 'Reception', query: { id: this.remotePeerId } });
       }

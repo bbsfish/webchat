@@ -68,6 +68,9 @@
     </div>
     <QRCode v-if="myPeerId" :text="connectionURL" />
     <div class="connect-form">
+      <div v-if="lastRemotePeerId">
+        <button @click="reconnect">前回の相手に再接続する</button>
+      </div>
       <InputText ref="formRemotePeerId" placeholder="相手のIDを入力" @change="(v) => remotePeerId = v" />
       <div>
         <span>登録した接続先</span>
@@ -115,59 +118,80 @@ export default {
       remotePeerId: '',
       recentRemotePeerId: [],
       vmSelectedRecents: '',
+      lastRemotePeerId: null,
     };
   },
   computed: {
     myPeerId: function() {
       return this.$store.getters.myPeerId;
     },
+    peer: function() {
+      return this.$store.getters.peer;
+    },
     connectionURL: function() {
       return `https://p2p-chat.vercel.app/connect?id=${this.myPeerId}`;
     },
   },
   async created() {
-    if (this.myPeerId) return;
+    // --- 1. PeerJSクライアントの初期化 ---
+    // myPeerIdがストアになければ、アプリの初回起動とみなし初期化処理を実行
+    if (!this.myPeerId) {
+      const lastPeerId = ws.ls.get('peer_id');
+      const peer = lastPeerId ? new Peer(lastPeerId.id) : new Peer();
+      this.$store.commit('setPeer', peer);
 
-    // アプリケーション開始時にPeerJSを初期化
-    // PeerServerへ接続し、自身のIDを取得
-    const lastPeerId = ws.ls.get('peer_id');
+      peer.on('open', (id) => {
+        console.debug('Peer is open');
+        if (!lastPeerId) ws.ls.set('peer_id', { id, created: new Date() });
+        this.$store.commit('setMyPeerId', id);
+      });
 
-    const peer = (() => {
-      if (!lastPeerId) return new Peer();
-      return new Peer(lastPeerId.id);
-    })();
+      // エラーハンドリングはApp.vueで集約しているのでここでは不要
+    }
 
-    this.$store.commit('setPeer', peer);
+    // --- 2. 接続待機リスナーの設定 ---
+    this.setupConnectionListener();
 
-    peer.on('open', (id) => {
-      console.debug('Peer is open');
-      if (!lastPeerId) ws.ls.set('peer_id', { id, created: new Date() });
-      this.$store.commit('setMyPeerId', id);
-    });
-
-    // 相手からの接続を待機
-    peer.on('connection', (connection) => {
+    // --- 3. 過去データの読み込み ---
+    this.recentRemotePeerId = await db.getAllClients();
+    const lastPeer = await db.getState('lastRemotePeerId');
+    if (lastPeer) {
+      this.lastRemotePeerId = lastPeer.value;
+    }
+  },
+  beforeUnmount() {
+    // HomeViewを離れる際に、重複登録を防ぐためリスナーを解除する
+    if (this.peer) {
+      this.peer.off('connection', this.onConnectionReceived);
+    }
+  },
+  methods: {
+    // 接続待機リスナーをセットアップするメソッド
+    setupConnectionListener() {
+      if (this.peer) {
+        // 既にpeerオブジェクトが存在する場合は、安全のために一度解除してから再設定
+        this.peer.off('connection', this.onConnectionReceived);
+        this.peer.on('connection', this.onConnectionReceived);
+      } else {
+        // peerオブジェクトがまだ生成されていない場合（初回起動時など）は、
+        // ストアの変更を監視して、生成されたらリスナーを設定する
+        const unwatch = this.$store.watch(
+          (state, getters) => getters.peer,
+          (newPeer) => {
+            if (newPeer) {
+              newPeer.on('connection', this.onConnectionReceived);
+              unwatch(); // 一度設定したら監視は解除
+            }
+          }
+        );
+      }
+    },
+    // 相手から接続要求があったときに呼び出されるメソッド
+    onConnectionReceived(connection) {
       console.debug('Connection is established');
       this.$store.commit('setConnection', connection);
       this.$router.push({ name: 'Connect', query: { id: connection.peer } });
-    });
-
-    peer.on('close', () => {
-      this.$dialog.alert('接続が切断されました(close)');
-    });
-
-    peer.on('disconnected', () => {
-      this.$dialog.alert('接続が切断されました(disconnected)');
-    });
-
-    peer.on('error', (err) => {
-      console.error(err);
-      this.$dialog.alert('接続が切断されました: ' + err.type);
-    });
-
-    this.recentRemotePeerId = await db.getAllClients();
-  },
-  methods: {
+    },
     async enableMessageSaving() {
       if (await this.$dialog.confirm('これを有効化すると、メッセージが保存されます. よろしいですか?') === false) return this.$refs.messageSaving.setOff();
       this.$store.commit('setOption', { k: 'isMessageSaved', v: true });
@@ -193,6 +217,10 @@ export default {
         return;
       }
       this.$router.push({ name: 'Connect', query: { id: remotePeerId } });
+    },
+    reconnect() {
+      if (!this.lastRemotePeerId) return;
+      this.$router.push({ name: 'Connect', query: { id: this.lastRemotePeerId } });
     },
   },
   watch: {

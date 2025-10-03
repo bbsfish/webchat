@@ -33,7 +33,7 @@ export default {
     };
   },
   computed: {
-    ...mapGetters(['connection']),
+    ...mapGetters(['connection', 'peer']),
     remotePeerId() {
       return this.$route.query?.id;
     },
@@ -42,11 +42,18 @@ export default {
     // クエリパラメータにdisconnectedがあれば、切断モードで表示
     if (this.$route.query.disconnected) {
       this.isDisconnected = true;
+      if (!this.peer) {
+        // Peerオブジェクトがない場合はHomeに戻す
+        this.$router.push({ name: 'Home' });
+        return;
+      }
       // 再接続を待機するため、相手からのconnectionを待つ
-      this.$store.getters.peer.on('connection', (newConnection) => {
+      this.peer.on('connection', (newConnection) => {
         this.$store.commit('setConnection', newConnection);
-        // 相手のIDを更新してKeyExchangeへ
-        this.$router.push({ name: 'KeyExchange', query: { id: newConnection.peer } });
+        // 役割を受信側として設定
+        this.$store.commit('setReceiver');
+        // ConnectViewに遷移して、接続プロセスを再開する
+        this.$router.push({ name: 'Connect', query: { id: newConnection.peer } });
       });
       return;
     }
@@ -79,13 +86,11 @@ export default {
   },
   beforeUnmount() {
     // コンポーネントが破棄される際にイベントリスナーを解除
-    const peer = this.$store.getters.peer;
-    if(peer) {
-        peer.off('connection');
+    if (this.peer) {
+        this.peer.off('connection');
     }
-    const connection = this.connection;
-    if (connection) {
-      connection.off('data', this.onDataReceived);
+    if (this.connection) {
+      this.connection.off('data', this.onDataReceived);
     }
   },
 };

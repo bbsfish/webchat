@@ -67,6 +67,7 @@ export default createStore({
       if (state.connection) state.connection.close();
       state.connection = null;
       state.isConnected = false;
+      state.isReceiver = false;
     },
     setMyPeerId(state, id) {
       console.debug('MyPeerId is set:', id);

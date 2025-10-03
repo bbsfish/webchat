@@ -20,7 +20,7 @@ class WebChatDB {
    * @param {string} dbName データベース名
    * @param {number} version データベースのバージョン
    */
-  constructor(dbName = 'webchat.db', version = 1) {
+  constructor(dbName = 'webchat.db', version = 2) { // バージョンを2に更新
     this.dbName = dbName;
     this.version = version;
     this.db = null;
@@ -48,6 +48,10 @@ class WebChatDB {
         // clients オブジェクトストア
         if (!db.objectStoreNames.contains('clients')) {
           db.createObjectStore('clients', { keyPath: 'id' });
+        }
+        // state オブジェクトストア (新規追加)
+        if (!db.objectStoreNames.contains('state')) {
+          db.createObjectStore('state', { keyPath: 'key' });
         }
       };
 
@@ -159,6 +163,27 @@ class WebChatDB {
    */
   async clearClients() {
     return this._execute('clients', 'readwrite', store => store.clear());
+  }
+
+  // --- State (新規追加) ---
+
+  /**
+   * アプリケーションの状態を保存/更新する
+   * @param {string} key - 状態のキー
+   * @param {any} value - 保存する値
+   * @returns {Promise<void>}
+   */
+  async setState(key, value) {
+    return this._execute('state', 'readwrite', store => store.put({ key, value }));
+  }
+
+  /**
+   * アプリケーションの状態を取得する
+   * @param {string} key - 状態のキー
+   * @returns {Promise<{key: string, value: any} | undefined>} 状態オブジェクト
+   */
+  async getState(key) {
+    return this._execute('state', 'readonly', store => store.get(key));
   }
 }
 
