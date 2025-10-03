@@ -9,15 +9,8 @@ const db = new WebChatDB();
 
 export default {
   name: 'ChatSecureView',
-  data() {
-    return {
-      keys: null,
-      enckey: null, // エンコードキー（暗号化鍵）
-      deckey: null, // デコードキー（複合化鍵）
-    };
-  },
   computed: {
-    ...mapGetters([ 'myPeerId', 'isReceiver', 'isMessageSaved', 'isAppEncryptionUsed' ]),
+    ...mapGetters([ 'myPeerId', 'isReceiver', 'isMessageSaved', 'isAppEncryptionUsed', 'enckey', 'deckey' ]), 
     remotePeerId: function() {
       return this.$route.query?.id;
     },
@@ -25,49 +18,25 @@ export default {
   async created() {
     this.$store.commit('setChat', { k: 'isLoading', v: true });
 
-    // 鍵を生成
-    this.$store.commit('setChat', { k: 'loadingMessage', v: '鍵を生成しています' });
-    this.keys = await crypto.generateKeys();
-    this.deckey = this.keys.privateKey;
-
-    // 1. レシーバーは初回にハローを送信する
-    if (this.isReceiver) {
-      this.$store.commit('setChat', { k: 'loadingMessage', v: '鍵を送信しています' });
-      const exportedPublicKeyJwk = await crypto.exportKeyAsJwk(this.keys.publicKey);
-      this.$store.dispatch('sendMessage', { type: 'rhello', content: exportedPublicKeyJwk });
-      this.$store.commit('setChat', { k: 'loadingMessage', v: '相手からの応答を待っています' });
+    if (!this.enckey || !this.deckey) {
+      this.$dialog.alert('暗号化キーが設定されていません。鍵交換からやり直してください。');
+      this.$router.push({ name: 'Home' });
+      return;
     }
-    else {
-      this.$store.commit('setChat', { k: 'loadingMessage', v: '相手からの応答を待っています' });
-    }
-
+  
     const connection = this.$store.getters.connection;
     connection.on('data', this.onDataReceived);
     connection.on('close', this.onConnectionClosed);
     connection.on('error', this.onConnectionError);
+
+    this.$store.commit('setChat', { k: 'isLoading', v: false });
   },
   methods: {
     async onDataReceived(data) {
       console.log('Received:', data);
-      // 1.1 レシーバーが暗号モードじゃないとき
+      // レシーバーが暗号モードじゃないとき
       if (data.type === 'hello') {
         this.$store.dispatch('sendMessage', { type: 'secure', content: null });
-        return;
-      }
-      // 2. サーバーは初回にハローを受け取り、鍵を送る
-      else if (data.type === 'rhello') {
-        this.enckey = await crypto.importJwkAsKey(data.content, ['encrypt']);
-        this.$store.commit('setChat', { k: 'loadingMessage', v: '鍵を送信しています' });
-        const exportedPublicKeyJwk = await crypto.exportKeyAsJwk(this.keys.publicKey);
-        this.$store.dispatch('sendMessage', { type: 'shello', content: exportedPublicKeyJwk });
-        this.$store.commit('setChat', { k: 'isLoading', v: false });
-        return;
-      }
-      // 3. レシーバーはサーバーから鍵を受け取る
-      else if (data.type === 'shello') {
-        this.enckey = await crypto.importJwkAsKey(data.content, ['encrypt']);
-        this.$store.commit('setChat', { k: 'loadingMessage', v: '' });
-        this.$store.commit('setChat', { k: 'isLoading', v: false });
         return;
       }
       else if (data.type !== 'text') return;
@@ -83,9 +52,9 @@ export default {
     onConnectionClosed() {
       this.$dialog.alert('接続が切断されました');
       this.$store.commit('closeConnection');
-      this.$router.push({ name: 'Home' });
+      this.$router.push({ name: 'Reception', query: { id: this.remotePeerId, disconnected: true } });
     },
-    onConnectionError() {
+    onConnectionError(err) {
       console.error(err);
       this.$dialog.alert(`通信エラーが発生しました: ${err.type}`);
     },

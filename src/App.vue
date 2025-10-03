@@ -5,23 +5,6 @@
 <script>
 export default {
   name: 'App',
-  methods: {
-    async onPeerClose() {
-      await this.$dialog.alert('接続が切断されました(peer-close)');
-      this.$store.commit('closeConnection');
-      this.$router.push({ name: 'Home' });
-    },
-    async onPeerDisconnected() {
-      await this.$dialog.alert('接続が切断されました(peer-disconnected)');
-      this.$store.commit('closeConnection');
-      this.$router.push({ name: 'Home' });
-    },
-    async onPeerError(err) {
-      await this.$dialog.alert(`接続エラーが発生しました: ${err.type}`);
-      console.error(err);
-      this.$router.push({ name: 'Home' });
-    },
-  },
   created() {
     this.$store.watch(
       (state, getters) => getters.peer,
@@ -32,6 +15,23 @@ export default {
         to.on('error', this.onPeerError);
       },
     )
+  },
+  methods: {
+    async onPeerClose() {
+      await this.$dialog.alert('接続が切断されました(peer-close)');
+      this.$store.commit('closeConnection');
+      this.$router.push({ name: 'Reception', query: { disconnected: true } });
+    },
+    async onPeerDisconnected() {
+      await this.$dialog.alert('接続が切断されました(peer-disconnected)');
+      this.$store.commit('closeConnection');
+      this.$router.push({ name: 'Reception', query: { disconnected: true } });
+    },
+    async onPeerError(err) {
+      await this.$dialog.alert(`接続エラーが発生しました: ${err.type}`);
+      console.error(err);
+      this.$router.push({ name: 'Home' });
+    },
   },
 };
 </script>

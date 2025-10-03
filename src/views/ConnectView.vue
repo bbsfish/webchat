@@ -68,29 +68,6 @@ export default {
       return regex.test(this.remotePeerId);
     },
   },
-  methods: {
-    connect() {
-      if (this.isConnectionNamed && this.connectionName === '') return this.$dialog.alert('この接続に付ける名前を入力してください');
-      else if (this.isConnectionNamed) {
-        db.addClient({ id: this.remotePeerId, alias: '', nickname: this.connectionName });
-      }
-      if (this.isReceiver && this.isAppEncryptionUsed) this.$router.push({ name: 'ChatSecure', query: { id: this.remotePeerId } });
-      else if (this.isReceiver) this.$router.push({ name: 'ChatPlain', query: { id: this.remotePeerId } });
-      else {
-        const connection = this.$store.getters.peer.connect(this.remotePeerId);
-        connection.on('open', () => {
-          console.debug('open connection');
-          this.$store.commit('setConnection', connection);
-          if (this.isAppEncryptionUsed) this.$router.push({ name: 'ChatSecure', query: { id: this.remotePeerId } });
-          else this.$router.push({ name: 'ChatPlain', query: { id: this.remotePeerId } });
-        });
-      }
-    },
-    cancel() {
-      if (this.isReceiver) this.$store.commit('closeConnection');
-      this.$router.push({ name: 'Home' });
-    }
-  },
   created() {
     if (this.$store.getters.isConnected) this.$store.commit('setReceiver');
     if (this.$store.getters.myPeerId) return;
@@ -114,17 +91,54 @@ export default {
 
     peer.on('close', () => {
       this.$dialog.alert('接続が切断されました(close)');
+      this.$router.push({ name: 'Home' });
     });
 
     peer.on('disconnected', () => {
       this.$dialog.alert('接続が切断されました(disconnected)');
+      this.$router.push({ name: 'Home' });
     });
 
     peer.on('error', (err) => {
       console.error(err);
       throw new Error(err.message);
     });
-  }
+  },
+  methods: {
+    async connect() {
+      // 接続に名前を付ける場合、DBに保存する
+      if (this.isConnectionNamed) {
+        if (this.connectionName === '') return this.$dialog.alert('この接続に付ける名前を入力してください');
+        db.addClient({ id: this.remotePeerId, alias: '', nickname: this.connectionName });
+      }
+      
+      // 送信者の場合、コネクションを確立
+      if (!this.isReceiver) {
+        await (() => new Promise((resolve, reject) => {
+          const connection = this.$store.getters.peer.connect(this.remotePeerId);
+          connection.on('open', () => {
+            this.$store.commit('setConnection', connection);
+            resolve();
+          });
+          connection.on('error', (err) => {
+            this.$dialog.alert('コネクションを確立できませんでした. やり直してください.');
+            console.error(err);
+            reject(err);
+          });
+        }))();
+        // ReceptionViewへ遷移して相手の応答を待つ
+        return this.$router.push({ name: 'Reception', query: { id: this.remotePeerId } });
+      }
+
+      // 受信者の場合、helloメッセージを送信して鍵交換ページへ遷移
+      this.$store.dispatch('sendMessage', { type: 'hello', content: null });
+      return this.$router.push({ name: 'KeyExchange', query: { id: this.remotePeerId } });
+    },
+    cancel() {
+      this.$store.commit('closeConnection');
+      this.$router.push({ name: 'Home' });
+    },
+  },
 }
 </script>
 

@@ -164,6 +164,8 @@ export default {
       console.error(err);
       this.$dialog.alert('接続が切断されました: ' + err.type);
     });
+
+    this.recentRemotePeerId = await db.getAllClients();
   },
   methods: {
     async enableMessageSaving() {
@@ -199,9 +201,6 @@ export default {
       this.remotePeerId = to;
       this.$refs.formRemotePeerId.set(to);
     },
-  },
-  async mounted() {
-    this.recentRemotePeerId = await db.getAllClients();
   },
 };
 </script>

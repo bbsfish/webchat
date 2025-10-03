@@ -19,27 +19,17 @@ export default {
   },
   async created() {
     this.$store.commit('setChat', { k: 'isLoading', v: true });
-
-    // 1. 受信者は初回にハローを送信する
-    if (this.isReceiver) {
-      this.$store.dispatch('sendMessage', { type: 'hello', content: null });
-      this.$store.commit('setChat', { k: 'isLoading', v: false });
-      this.isLoading = false;
-    }
+    
     const connection = this.$store.getters.connection;
     connection.on('data', this.onDataReceived);
     connection.on('close', this.onConnectionClosed);
     connection.on('error', this.onConnectionError);
+    this.$store.commit('setChat', { k: 'isLoading', v: false });
   },
   methods: {
     async onDataReceived(data) {
       console.log('Received:', data);
-      // 送信者は初回にハローを受け取る
-      if (data.type === 'hello') {
-        this.$store.commit('setChat', { k: 'isLoading', v: false });
-        return;
-      }
-      else if (data.type === 'secure') {
+      if (data.type === 'secure') {
         const res = await this.$dialog.confirm('相手がアプリケーション暗号モードを使用しています. 有効化しますか?');
         if (res) {
           this.$store.commit('setOption', { k: 'isAppEncryptionUsed', v: true });
@@ -59,7 +49,7 @@ export default {
     onConnectionClosed() {
       this.$dialog.alert('接続が切断されました(connection-close)');
       this.$store.commit('closeConnection');
-      this.$router.push({ name: 'Home' });
+      this.$router.push({ name: 'Reception', query: { id: this.remotePeerId, disconnected: true } });
     },
     onConnectionError(err) {
       console.error(err);

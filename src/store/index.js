@@ -31,6 +31,10 @@ export default createStore({
       /** @type { String } 送信コンツンツが更新されたことを通知 */
       isContentUpdated: false,
     },
+    /** @type { CryptoKey } 暗号化キー */
+    enckey: null,
+    /** @type { CryptoKey } 復号化キー */
+    deckey: null,
   },
   getters: {
     peer: (state) => state.peer,
@@ -42,6 +46,8 @@ export default createStore({
     isMessageSaved: (state) => state.options.isMessageSaved,
     isAppEncryptionUsed: (state) => state.options.isAppEncryptionUsed,
     chat: (state) => state.chat,
+    enckey: (state) => state.enckey,
+    deckey: (state) => state.deckey,
   },
   mutations: {
     setPeer(state, peer) {
@@ -86,7 +92,11 @@ export default createStore({
     },
     setChat(state, { k, v }) {
       state.chat[k] = v;
-    }
+    },
+    setKeys(state, { enckey, deckey }) {
+      if (enckey !== undefined) state.enckey = enckey;
+      if (deckey !== undefined) state.deckey = deckey;
+    },
   },
   actions: {
     sendMessage({ getters }, { type, content }) {
