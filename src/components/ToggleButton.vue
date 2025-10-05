@@ -55,8 +55,17 @@ export default {
       this.vmCheckBox = false;
     },
   },
+  /**
+   * ★★★ 変更箇所 ★★★
+   * mountedフックで初期値を設定する際に、watchが発火して
+   * イベントをemitしないように、フラグで制御します。
+   */
   mounted() {
+    this.isEmitting = false;
     this.vmCheckBox = this.init;
+    this.$nextTick(() => {
+      this.isEmitting = true;
+    });
   },
 };
 </script>

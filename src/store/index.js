@@ -82,6 +82,12 @@ export default createStore({
       console.debug('Message is added:', data);
       state.messages.push(data);
     },
+    updateMessageDownloadState(state, { transferId, downloadState }) {
+      const message = state.messages.find(m => m.content.transferId === transferId);
+      if (message) {
+        message.content.downloadState = downloadState;
+      }
+    },
     setOption(state, { k, v }) {
       console.debug('Option is changed: %s = %s', k, v);
       state.options[k] = v;
