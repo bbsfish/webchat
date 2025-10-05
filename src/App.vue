@@ -64,7 +64,9 @@ export default {
 };
 </script>
 
-<style>
+<style lang="scss">
+@use '@/styles/variables.scss' as var;
+
 html, body, #app {
   height: 100%;
   margin: 0;

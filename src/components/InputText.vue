@@ -39,8 +39,8 @@ export default {
 
 <style lang="scss" scoped>
 input {
+  display: block;
   padding: 10px 12px;
-  // width: calc(100% - 24px - 2px);
-  width: 300px;
+  width: calc(100% - 24px - 2px);
 }
 </style>

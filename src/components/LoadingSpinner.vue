@@ -18,11 +18,13 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@use '@/styles/variables.scss' as var;
+
 .loading-spinner {
   .spinner {
     margin: 2rem auto;
     border: 4px solid #f3f3f3;
-    border-top: 4px solid #42b983;
+    border-top: 4px solid var.$green;
     border-radius: 50%;
     width: 40px;
     height: 40px;

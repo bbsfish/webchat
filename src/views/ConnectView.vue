@@ -1,5 +1,6 @@
 <template>
   <div class="connect-container">
+    <CommonHeader />
     <div class="connect-header">
       <h1>相手との接続</h1>
     </div>
@@ -63,6 +64,7 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ToggleButton from '@/components/ToggleButton.vue';
 import SpeechBubble from '@/components/SpeechBubble.vue';
 import InputText from '@/components/InputText.vue';
+import CommonHeader from '@/components/CommonHeader.vue';
 
 export default {
   name: 'ConnectView',
@@ -72,6 +74,7 @@ export default {
     ToggleButton,
     SpeechBubble,
     InputText,
+    CommonHeader,
   },
   data() {
     return {
@@ -217,22 +220,16 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-$line-green: #06c755;
-$line-bg: #f0f2f5;
-$line-header-bg: #ffffff;
-$line-border: #e0e0e0;
-$text-color: #333;
-$text-muted-color: #888;
-$danger-color: #d9534f;
+@use '@/styles/variables.scss' as var;
 
 .connect-container {
-  background-color: $line-bg;
+  background-color: var.$bg;
   min-height: 100%;
-  color: $text-color;
+  color: var.$text-color;
 }
 
 .connect-header {
-  background-color: $line-green;
+  background-color: var.$green;
   color: white;
   padding: 16px;
   text-align: center;
@@ -252,7 +249,7 @@ $danger-color: #d9534f;
 }
 
 .card {
-  background-color: $line-header-bg;
+  background-color: var.$header-bg;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -270,7 +267,7 @@ $danger-color: #d9534f;
 .error-state, .loading-state {
   padding: 20px;
   p {
-    color: $text-muted-color;
+    color: var.$text-muted-color;
     font-size: 1rem;
     margin-top: 16px;
   }
@@ -278,12 +275,12 @@ $danger-color: #d9534f;
 
 .error-state {
   p {
-    color: $danger-color;
+    color: var.$danger-color;
     font-weight: bold;
   }
   .home-btn {
     margin-top: 20px;
-    background-color: $line-green;
+    background-color: var.$green;
     color: white;
   }
 }
@@ -292,7 +289,7 @@ $danger-color: #d9534f;
   .confirm-message {
     margin-bottom: 24px;
     line-height: 1.6;
-    color: $text-color;
+    color: var.$text-color;
   }
   
   .remote-peer-id {
@@ -302,7 +299,7 @@ $danger-color: #d9534f;
 
   .confirm-options {
     background-color: #f9f9f9;
-    border: 1px solid $line-border;
+    border: 1px solid var.$border-color;
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 24px;
@@ -353,7 +350,7 @@ button {
 }
 
 .connect-btn {
-  background-color: $line-green;
+  background-color: var.$green;
   color: white;
 }
 

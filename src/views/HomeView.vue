@@ -1,13 +1,11 @@
 <template>
-  <div class="home-container">
-    <div class="home-header">
-      <h1>P2P WebChat</h1>
-    </div>
+  <div class="home">
+    <CommonHeader />
 
     <div class="home-content">
       <div class="card">
+        <h2>あなたのID</h2>
         <div v-if="myPeerId">
-          <h2>あなたのID</h2>
           <ClipboardBox :text="myPeerId" />
           <div class="qr-code-wrapper">
             <QRCode v-if="myPeerId" :text="connectionURL" />
@@ -15,7 +13,7 @@
           </div>
         </div>
         <div v-else class="loading-peer">
-          <p>PeerServerに接続中...</p>
+          <LoadingSpinner m="サーバーに接続中" />
         </div>
       </div>
 
@@ -94,6 +92,8 @@ import SpeechBubble from '@/components/SpeechBubble.vue';
 import QRCode from '@/components/QRCode.vue';
 import InputText from '@/components/InputText.vue';
 import ClipboardBox from '@/components/ClipboardBox.vue';
+import CommonHeader from '@/components/CommonHeader.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 
 export default {
   name: 'HomeView',
@@ -104,6 +104,8 @@ export default {
     ToggleButton,
     InputText,
     QRCode,
+    CommonHeader,
+    LoadingSpinner,
   },
   data() {
     return {
@@ -178,31 +180,12 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-$line-green: #06c755;
-$line-bg: #f0f2f5;
-$line-header-bg: #ffffff;
-$line-border: #e0e0e0;
-$text-color: #333;
-$text-muted-color: #888;
-$danger-color: #d9534f;
+@use '@/styles/variables.scss' as var;
 
-.home-container {
-  background-color: $line-bg;
+.home {
+  background-color: var.$bg;
   min-height: 100%;
-  color: $text-color;
-}
-
-.home-header {
-  background-color: $line-green;
-  color: white;
-  padding: 16px;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-
-  h1 {
-    margin: 0;
-    font-size: 1.5rem;
-  }
+  color: var.$text-color;
 }
 
 .home-content {
@@ -210,10 +193,16 @@ $danger-color: #d9534f;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  max-width: var.$max-width;
+  margin: 0 auto;
+  @include var.mobile {
+    max-width: 100%;
+    margin: 0 0.2rem;
+  }
 }
 
 .card {
-  background-color: $line-header-bg;
+  background-color: var.$header-bg;
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -222,7 +211,7 @@ $danger-color: #d9534f;
     margin-top: 0;
     margin-bottom: 16px;
     font-size: 1.1rem;
-    border-bottom: 1px solid $line-border;
+    border-bottom: 1px solid var.$border-color;
     padding-bottom: 8px;
   }
 }
@@ -230,7 +219,7 @@ $danger-color: #d9534f;
 .loading-peer {
   text-align: center;
   padding: 20px;
-  color: $text-muted-color;
+  color: var.$text-muted-color;
 }
 
 .qr-code-wrapper {
@@ -240,7 +229,7 @@ $danger-color: #d9534f;
   p {
     margin-top: 8px;
     font-size: 0.9rem;
-    color: $text-muted-color;
+    color: var.$text-muted-color;
   }
 }
 
@@ -267,7 +256,7 @@ $danger-color: #d9534f;
     select {
       flex-grow: 1;
       padding: 10px 12px;
-      border: 1px solid $line-border;
+      border: 1px solid var.$border-color;
       border-radius: 8px;
       background-color: #f9f9f9;
       font-size: 1rem;
@@ -275,14 +264,17 @@ $danger-color: #d9534f;
 
       &:focus {
         outline: none;
-        border-color: $line-green;
       }
     }
   }
 
   .connect-btn {
-    background-color: $line-green;
-    color: white;
+    @include var.buttonAnimation;
+    color: var.$white;
+    background-color: var.$button-color;
+    &:hover {
+      background-color: var.$button-hovered-color;
+    }
   }
 }
 
@@ -292,8 +284,7 @@ button {
   padding: 12px 20px;
   font-size: 1rem;
   font-weight: bold;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
+  @include var.buttonAnimation;
 
   &:hover {
     opacity: 0.85;
@@ -327,14 +318,13 @@ button {
     
     button {
       background-color: #f0f2f5;
-      color: $text-color;
+      color: var.$text-color;
       font-weight: normal;
       padding: 10px;
 
       &.danger {
-        background-color: $danger-color;
+        background-color: var.$danger-color;
         color: white;
-        grid-column: 1 / -1; /* Span full width */
       }
     }
   }

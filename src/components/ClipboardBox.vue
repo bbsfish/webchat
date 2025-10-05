@@ -2,53 +2,39 @@
   <div class="clipboard-box">
     <input ref="textToCopy" :value="text" readonly class="text-display" />
     <button @click="copyToClipboard" class="copy-button">
-      {{ copyButtonText }}
+      <IconClipboard />
     </button>
   </div>
 </template>
 
 <script>
+import IconClipboard from '@/components/icons/IconClipboard.vue';
+
 export default {
   name: 'ClipboardBox',
+  components: {
+    IconClipboard,
+  },
   props: {
-    // コピー対象のテキストをプロパティとして受け取る
+    // コピー対象のテキスト
     text: {
       type: String,
       required: true,
     },
   },
-  data() {
-    return {
-      // ボタンのテキストを管理
-      copyButtonText: 'コピー',
-    };
-  },
   methods: {
-    /**
-     * テキストをクリップボードにコピーする
-     */
     async copyToClipboard() {
       // navigator.clipboardが使えないブラウザの場合は何もしない
       if (!navigator.clipboard) {
-        this.$dialog.alert('お使いのブラウザはクリップボードAPIに対応していません。');
+        this.$dialog.alert('お使いのブラウザではクリップボードにコピーできませんでした');
         return;
       }
 
       try {
         // テキストをクリップボードに書き込む
         await navigator.clipboard.writeText(this.text);
-        
-        // ボタンのテキストを一時的に変更してフィードバック
-        this.copyButtonText = 'コピーしました！';
-        
-        // 1.5秒後にボタンのテキストを元に戻す
-        setTimeout(() => {
-          this.copyButtonText = 'コピー';
-        }, 1500);
-
       } catch (err) {
         console.error('クリップボードへのコピーに失敗しました:', err);
-        this.$dialog.alert('クリップボードへのコピーに失敗しました。');
       }
     },
   },
@@ -56,17 +42,14 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-$line-border: #e0e0e0;
-$line-green: #06c755;
+@use '@/styles/variables.scss' as var;
 
 .clipboard-box {
-  display: inline-flex; 
+  display: flex; 
   align-items: center;
-  border: 1px solid $line-border;
+  border: 1px solid var.$border-color;
   border-radius: 8px;
   overflow: hidden;
-  max-width: 600px;
-  margin: 10px 0;
   
   .text-display {
     flex-grow: 1;
@@ -79,11 +62,12 @@ $line-green: #06c755;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: center;
   }
   
   .copy-button {
     border: none;
-    background-color: $line-green;
+    background-color: var.$green;
     color: white;
     font-weight: bold;
     padding: 10px 20px;
@@ -92,7 +76,7 @@ $line-green: #06c755;
     flex-shrink: 0;
     
     &:hover {
-      background-color: darken($line-green, 10%);
+      background-color: darken(var.$green, 10%);
     }
   }
 }
