@@ -16,25 +16,26 @@
             <ToggleButton
               ref="encryptionToggle"
               :init="isEncryptionActive"
-              @on="requestEnableEncryption"
-              @off="requestDisableEncryption"
+              @toggle="requestEncryptionModeChange"
             />
           </div>
         </div>
         <button @click="disconnect" class="disconnect-btn">切断</button>
       </div>
 
-      <div class="loading-spinner-wrap" v-if="isLoading || isAwaitingAck">
+      <div class="loading-spinner-wrap" v-if="isLoading">
         <LoadingSpinner :m="loadingMessage" />
       </div>
 
-      <div class="message-list">
-        <div v-for="(m, i) in $store.getters.messages" :key="i" class="message-row" :class="{ 'my-message-row': m.from === myPeerId }">
+      <div class="message-list" ref="messageList">
+        <div v-for="(m, i) in $store.getters.messages"
+          class="message-row" :class="{ 'my-message-row': m.from === myPeerId }" :key="i">
           <div class="message">
             <p class="message-content">{{ m.content }}</p>
             <span class="message-time">{{ new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}</span>
           </div>
         </div>
+        <div ref="bottomMessageRef"></div>
       </div>
 
       <div class="message-form">
@@ -47,10 +48,10 @@
 
 <script>
 import { mapGetters } from 'vuex';
-import WebChatDB from '@/lib/webchatdb';
-const db = new WebChatDB();
-import Encryption from '@/lib/encryption';
-const crypto = new Encryption();
+import Database from '@/lib/database';
+const db = new Database();
+import Crypto from '@/lib/crypto';
+const crypto = new Crypto();
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ToggleButton from '@/components/ToggleButton.vue';
 import SpeechBubble from '@/components/SpeechBubble.vue';
@@ -66,38 +67,28 @@ export default {
   },
   data() {
     return {
-      isLoading: false,
-      loadingMessage: '',
+      isLoading: true,
+      loadingMessage: '初期化しています',
       vmNewMessage: '',
-      isEncryptionActive: true, // createdフックで正しい値に上書き
+      isEncryptionActive: true,
       isAwaitingAck: false,
     };
   },
   computed: {
-    ...mapGetters(['myPeerId', 'isMessageSaved', 'isAppEncryptionDisabled', 'enckey', 'deckey', 'isReceiver']),
+    ...mapGetters(['myPeerId', 'isReceiver', 'isServer', 'isMessageSaved', 'isAppEncryptionEnabled', 'keys']),
     remotePeerId: function() {
       return this.$route.query?.id;
     },
     isValidId() {
       const regex = new RegExp(/^([0-9a-f]{8})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{12})$/);
-      return regex.test(this.remotePeerId)
+      return regex.test(this.remotePeerId);
     },
   },
-  async created() {
-    // ★修正点1: createdフックで初期値を設定
-    this.isEncryptionActive = !this.$store.getters.isAppEncryptionDisabled;
-    
-    this.isLoading = true;
-    this.loadingMessage = '初期化しています...';
+  async created() {    
+    this.isEncryptionActive = this.$store.getters.isAppEncryptionEnabled;
 
     const messages = await db.getAllMessages();
     this.$store.commit('setMessages', messages);
-
-    if (!this.isAppEncryptionDisabled && (!this.enckey || !this.deckey)) {
-      this.$dialog.alert('暗号化キーが設定されていません。鍵交換からやり直してください。');
-      this.$router.push({ name: 'Home' });
-      return;
-    }
 
     const connection = this.$store.getters.connection;
     if (connection) {
@@ -119,73 +110,66 @@ export default {
       this.$router.push({ name: 'Home' });
     },
     async onDataReceived(data) {
-      console.log('Received:', data);
+      console.log('Data is received:', data);
 
-      if (data.type === 'request-disable-encryption') {
-        const res = await this.$dialog.confirm('相手がアプリケーション暗号化を使用しないように要請しています。変更しますか？');
-        if (res) {
-          this.isEncryptionActive = false;
-          this.$refs.encryptionToggle.setOff();
-          this.$store.dispatch('sendMessage', { type: 'ack-disable-encryption', content: null });
-        } else {
-          this.disconnect();
+      // 暗号化設定変更の要求が来たら、確認して、設定する
+      if (data.type === 'change-encryption-option') {
+        let isConfirmed = false;
+        if (data.content.to) isConfirmed = await this.$dialog.confirm('相手がアプリケーション暗号化を有効化するように求めています. 有効化しますか?');
+        else isConfirmed = await this.$dialog.confirm('相手がアプリケーション暗号化を無効化するように求めています. 無効化しますか?');
+        if (isConfirmed) {
+          this.$store.commit('setOption', { k: 'isAppEncryptionEnabled', v: data.content.to });
+          this.$refs.encryptionToggle.set(data.content.to);
+          this.$store.dispatch('sendMessage', { type: 'change-encryption-option-success', content: data.content });
         }
+        else this.$store.dispatch('sendMessage', { type: 'change-encryption-option-failed', content: data.content });
         return;
       }
-
-      if (data.type === 'ack-disable-encryption') {
-        this.isEncryptionActive = false;
-        this.isAwaitingAck = false;
+      // 暗号化設定変更の要求が承認されたら、設定を終える
+      else if (data.type === 'change-encryption-option-success') {
+        this.isLoading = false;
         this.loadingMessage = '';
         return;
       }
-
-      if (data.type === 'request-enable-encryption') {
-        const res = await this.$dialog.confirm('相手がアプリケーション暗号化を有効化するように要請しています。変更しますか？');
-        if (res) {
-          this.isEncryptionActive = true;
-          this.$refs.encryptionToggle.setOn();
-          this.$store.dispatch('sendMessage', { type: 'ack-enable-encryption', content: null });
-        } else {
-          this.$store.dispatch('sendMessage', { type: 'nack-enable-encryption', content: null });
-          this.disconnect();
-        }
-        return;
-      }
-
-      if (data.type === 'ack-enable-encryption') {
-        this.isEncryptionActive = true;
-        this.isAwaitingAck = false;
+      // 暗号化設定変更の要求が拒否されたら、元の設定に戻す
+      else if (data.type === 'change-encryption-option-failed') {
+        this.$dialog.alert('設定の変更が拒否されました');
+        this.$refs.encryptionToggle.set(data.content.from);
+        this.$store.commit('setOption', { k: 'isAppEncryptionEnabled', v: data.content.from });
         this.loadingMessage = '';
+        this.isLoading = false;
         return;
       }
 
-      if (data.type === 'nack-enable-encryption') {
-        this.isAwaitingAck = false;
-        this.loadingMessage = '';
-        this.$refs.encryptionToggle.setOff();
-        await this.$dialog.alert('相手が要請を拒否したため、接続が切断されます。');
-        this.disconnect();
-        return;
-      }
-
+      // テキストメッセージを受信したとき
       if (data.type === 'text') {
         let content = data.content;
-        if (this.isEncryptionActive) {
-            try {
-                content = await crypto.decrypt(data.content, this.deckey);
-            } catch (e) {
-                console.error('Decryption failed:', e);
-                this.$dialog.alert('メッセージの復号に失敗しました。暗号化設定が一致しない可能性があります。');
-                return;
-            }
+        if (this.isAppEncryptionEnabled) {
+          try {
+            content = await crypto.decrypt(data.content, this.keys.decoder);
+          } catch (e) {
+            console.error('Decryption failed:', e);
+            this.$dialog.alert('メッセージの復号に失敗しました。暗号化設定が一致しない可能性があります。');
+            return;
+          }
         }
         
         const message = { ...data, content, me: 0 };
         this.$store.commit('addMessage', message);
 
+        this.$nextTick(() => {
+          const container = this.$refs.messageList;
+          const bottomMarker = this.$refs.bottomMessageRef;
+          if (container && bottomMarker) {
+            container.scrollTo({
+              top: bottomMarker.offsetTop + 61,
+              behavior: 'smooth',
+            });
+          }
+        });
+
         if (this.isMessageSaved) {
-            db.addMessage(message);
+          db.addMessage(message);
         }
       }
     },
@@ -198,7 +182,7 @@ export default {
         this.$dialog.alert('接続が切断されました');
       }
       this.$store.commit('closeConnection');
-      this.$router.push({ name: 'Reception', query: { id: this.remotePeerId, disconnected: true } });
+      this.$router.push({ name: 'Home' });
     },
     onConnectionError(err) {
       console.error(err);
@@ -211,8 +195,8 @@ export default {
       const plainMessage = msg;
       let messageContent = plainMessage;
 
-      if (this.isEncryptionActive) {
-        messageContent = await crypto.encrypt(plainMessage, this.enckey);
+      if (this.isAppEncryptionEnabled) {
+        messageContent = await crypto.encrypt(plainMessage, this.keys.encoder);
       }
 
       const message = await this.$store.dispatch('sendMessage', { type: 'text', content: messageContent });
@@ -224,35 +208,28 @@ export default {
       const displayMessage = { ...message, content: plainMessage, me: 1 };
       this.$store.commit('addMessage', displayMessage);
 
+      this.$nextTick(() => {
+        const container = this.$refs.messageList;
+        const bottomMarker = this.$refs.bottomMessageRef;
+        if (container && bottomMarker) {
+          container.scrollTo({
+            top: bottomMarker.offsetTop + 61,
+            behavior: 'smooth',
+          });
+        }
+      });
+
       if (this.isMessageSaved) {
         db.addMessage(displayMessage);
       }
       
       this.vmNewMessage = '';
     },
-    // ★修正点2: 不要なUI復元ロジックを削除
-    requestDisableEncryption() {
-      if (!this.isEncryptionActive || this.isAwaitingAck) {
-        return;
-      };
-      this.isAwaitingAck = true;
-      this.loadingMessage = '相手の応答を待っています...';
-      this.$store.dispatch('sendMessage', { type: 'request-disable-encryption', content: null });
-    },
-    requestEnableEncryption() {
-      if (this.isEncryptionActive || this.isAwaitingAck) {
-        return;
-      }
-      
-      if (!this.enckey || !this.deckey) {
-        this.$dialog.alert('暗号化キーが存在しないため、暗号化を有効にできません。');
-        this.$refs.encryptionToggle.setOff();
-        return;
-      }
-
-      this.isAwaitingAck = true;
-      this.loadingMessage = '相手の応答を待っています...';
-      this.$store.dispatch('sendMessage', { type: 'request-enable-encryption', content: null });
+    requestEncryptionModeChange(to) {
+      this.isLoading = true;
+      this.loadingMessage = '相手の応答を待っています';
+      this.$store.commit('setOption', { k: 'isAppEncryptionEnabled', v: to });
+      this.$store.dispatch('sendMessage', { type: 'change-encryption-option', content: { to, from: !to } });
     },
   },
   beforeUnmount() {
@@ -267,7 +244,6 @@ export default {
 </script>
 
 <style lang="scss" scoped>
-/* スタイルは変更なし */
 $line-bg: #eef1f4;
 $line-green: #06c755;
 $line-header: #ffffff;
@@ -276,15 +252,20 @@ $line-text-light: #050505;
 $line-text-muted: #aaaaaa;
 $line-border: #e0e0e0;
 
+.chat-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* 100dvh から 100% に変更 */
+}
+
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
+  flex-grow: 1; /* Fill available space */
   width: 100%;
   background-color: $line-bg;
   color: $line-text;
-  overflow: hidden;
+  overflow: hidden; /* Prevents overflow */
 }
 
 .chat-header {
@@ -335,6 +316,7 @@ $line-border: #e0e0e0;
   flex-grow: 1;
   overflow-y: auto;
   padding: 16px;
+  position: relative;
 }
 
 .message-row {
@@ -356,9 +338,10 @@ $line-border: #e0e0e0;
 .message {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
+  gap: 2px;
   .message-content {
     padding: 10px 14px;
+    margin: 0;
     border-radius: 18px;
     background-color: $line-header;
     max-width: 250px;

@@ -1,4 +1,4 @@
-class Encryption {
+class Crypto {
   constructor() {
     this.algorithm = {
       name: 'RSA-OAEP',
@@ -115,4 +115,4 @@ class Encryption {
   }
 }
 
-export default Encryption;
+export default Crypto;

@@ -23,6 +23,7 @@ export default {
   },
   data() {
     return {
+      isEmitting: true,
       vmCheckBox: false,
     };
   },
@@ -33,6 +34,7 @@ export default {
   },
   watch: {
     async vmCheckBox(to, from) {
+      if (!this.isEmitting) return;
       if (this.lock) return this.$nextTick(() => this.vmCheckBox = from);
       if (to) this.$emit('on');
       else this.$emit('off');
@@ -41,6 +43,11 @@ export default {
   },
   /** 親コンポーネントからの呼び出し用 */
   methods: {
+    set(v, isEmitting = false) {
+      this.isEmitting = isEmitting;
+      this.vmCheckBox = v;
+      this.$nextTick(() => this.isEmitting = true);
+    },
     setOn() {
       this.vmCheckBox = true;
     },

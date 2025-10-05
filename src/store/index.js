@@ -9,7 +9,7 @@ export default createStore({
     connection: null,
     /** @type { String } PeerISのシグナリングサーバから発行された一意のID */
     myPeerId: null,
-    /** @type { Boolean } コネクションが確立するとtrueになる */
+    /** @type { Boolean } DataConnectionが確立するとtrueになる */
     isConnected: false,
     /** @type { Boolean } 自分がコネクション接続側なのか、受付側なのか */
     isReceiver: false,
@@ -17,13 +17,20 @@ export default createStore({
     messages: [],
     /** ユーザーオプションデータ */
     options: {
+      /** @type { Boolean } メッセージ保存 */
       isMessageSaved: false,
-      isAppEncryptionDisabled: false,
+      /** @type { Boolean } アプリケーション暗号有効化 */
+      isAppEncryptionEnabled: true,
     },
-    /** @type { CryptoKey } 暗号化キー */
-    enckey: null,
-    /** @type { CryptoKey } 復号化キー */
-    deckey: null,
+    /** アプリケーション暗号化データ */
+    keys: {
+      /** @type { CryptoKey } 自分の公開鍵 */
+      publicKey: null,
+      /** @type { CryptoKey } 暗号化鍵（相手の公開鍵） */
+      encoder: null,
+      /** @type { CryptoKey } 複合化鍵 */
+      decoder: null,
+    },
   },
   getters: {
     peer: (state) => state.peer,
@@ -31,12 +38,12 @@ export default createStore({
     myPeerId: (state) => state.myPeerId,
     isConnected: (state) => state.isConnected,
     messages: (state) => state.messages,
+    isServer: (state) => !state.isReceiver,
     isReceiver: (state) => state.isReceiver,
     isMessageSaved: (state) => state.options.isMessageSaved,
-    isAppEncryptionDisabled: (state) => state.options.isAppEncryptionDisabled,
-    isAppEncryptionUsed: (state) => !state.options.isAppEncryptionDisabled,
-    enckey: (state) => state.enckey,
-    deckey: (state) => state.deckey,
+    isAppEncryptionEnabled: (state) => state.options.isAppEncryptionEnabled,
+    isAppEncryptionDisabled: (state) => !state.options.isAppEncryptionEnabled,
+    keys: (state) => state.keys,
   },
   mutations: {
     setPeer(state, peer) {
@@ -44,7 +51,10 @@ export default createStore({
       state.peer = peer;
     },
     closePeer(state) {
+      console.debug('Peer is closed');
       state.peer.disconnect();
+      state.isConnected = false;
+      state.connection = null;
     },
     setConnection(state, connection) {
       console.debug('Connection is set:', connection);
@@ -56,14 +66,13 @@ export default createStore({
       if (state.connection) state.connection.close();
       state.connection = null;
       state.isConnected = false;
-      state.isReceiver = false;
     },
     setMyPeerId(state, id) {
       console.debug('MyPeerId is set:', id);
       state.myPeerId = id;
     },
-    setReceiver(state) {
-      state.isReceiver = true;
+    setReceiversFlag(state, flag) {
+      state.isReceiver = flag;
     },
     setMessages(state, data) {
       console.debug('Messages are overwrited:', data);
@@ -73,18 +82,15 @@ export default createStore({
       console.debug('Message is added:', data);
       state.messages.push(data);
     },
-    clearMessages(state) {
-      console.debug('Message is cleared');
-      state.messages = [];
-    },
     setOption(state, { k, v }) {
       console.debug('Option is changed: %s = %s', k, v);
       state.options[k] = v;
     },
-    setKeys(state, { enckey, deckey }) {
+    setKeys(state, { publicKey, encoder, decoder }) {
       console.debug('CryptoKeys are set');
-      if (enckey !== undefined) state.enckey = enckey;
-      if (deckey !== undefined) state.deckey = deckey;
+      if (publicKey !== undefined) state.keys.publicKey = publicKey;
+      if (encoder !== undefined) state.keys.encoder = encoder;
+      if (decoder !== undefined) state.keys.decoder = decoder;
     },
   },
   actions: {
@@ -92,6 +98,7 @@ export default createStore({
       console.group('MessageSending');
       if (getters.connection === null && !this.$store.getters.isConnected) {
         console.debug('failed');
+        console.groupEnd();
         return;
       }
       const message = {
@@ -100,7 +107,7 @@ export default createStore({
         timestamp: new Date(),
         content,
       };
-      console.debug(message);
+      console.debug('message:', message);
       getters.connection.send(message);
       console.debug('success');
       console.groupEnd();

@@ -15,7 +15,13 @@
  * @property {string} nickname - ニックネーム
  */
 
-class WebChatDB {
+/**
+ * @typedef {object} State
+ * @property {string} key - キー
+ * @property {any} value - 値
+ */
+
+class Database {
   /**
    * @param {string} dbName データベース名
    * @param {number} version データベースのバージョン
@@ -49,7 +55,7 @@ class WebChatDB {
         if (!db.objectStoreNames.contains('clients')) {
           db.createObjectStore('clients', { keyPath: 'id' });
         }
-        // state オブジェクトストア (新規追加)
+        // state オブジェクトストア
         if (!db.objectStoreNames.contains('state')) {
           db.createObjectStore('state', { keyPath: 'key' });
         }
@@ -180,11 +186,28 @@ class WebChatDB {
   /**
    * アプリケーションの状態を取得する
    * @param {string} key - 状態のキー
-   * @returns {Promise<{key: string, value: any} | undefined>} 状態オブジェクト
+   * @returns {Promise<any | undefined>} 状態の値
    */
   async getState(key) {
-    return this._execute('state', 'readonly', store => store.get(key));
+    const result = await this._execute('state', 'readonly', store => store.get(key));
+    return result ? result.value : undefined;
+  }
+
+  /**
+   * stateストアのすべてのキーを取得する
+   * @returns {Promise<IDBValidKey[]>}
+   */
+  async getKeys() {
+    return this._execute('state', 'readonly', store => store.getAllKeys());
+  }
+
+  /**
+   * stateストアのすべてのデータを削除する
+   * @returns {Promise<void>}
+   */
+  async clearStates() {
+    return this._execute('state', 'readwrite', store => store.clear());
   }
 }
 
-export default WebChatDB;
+export default Database;
