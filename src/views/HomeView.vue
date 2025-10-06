@@ -119,7 +119,7 @@ export default {
     ...mapGetters(['peer', 'myPeerId', 'isAppEncryptionEnabled', 'isMessageSaved']),
     connectionURL: function() {
       // return `https://p2p-chat.vercel.app/connect?id=${this.myPeerId}`;
-      return `${window.location.origin}/connect?id=${this.myPeerId}`
+      return `${window.location.origin}/app/connect?id=${this.myPeerId}`
     },
   },
   async created() {
