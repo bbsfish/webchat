@@ -1,16 +1,16 @@
 {
   "rewrites": [
     {
+      "source": "/",
+      "destination": "/home.html"
+    },
+    {
       "source": "/app",
-      "destination": "/index.html"
+      "destination": "/app/index.html"
     },
     {
       "source": "/app/:path*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/",
-      "destination": "/home.html"
+      "destination": "/app/index.html"
     }
   ]
 }
