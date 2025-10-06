@@ -11,6 +11,18 @@
     {
       "source": "/app/:path*",
       "destination": "/app/index.html"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/app/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/app/sitemap.xml"
+    },
+    {
+      "source": "/site.webmanifest",
+      "destination": "/app/site.webmanifest"
     }
   ]
 }
